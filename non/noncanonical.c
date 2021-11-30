@@ -6,7 +6,9 @@
 #include <termios.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "common.h"
+#include <strings.h>
+#include <unistd.h>
+#include "../common/common.h"
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
@@ -17,13 +19,11 @@ volatile int STOP = 0;
 
 int main(int argc, char **argv)
 {
-  int fd, c, res;
+  int fd, res;
   struct termios oldtio, newtio;
   char buf[255], msg[5];
 
-  if ((argc < 2) ||
-      ((strcmp("/dev/ttyS0", argv[1]) != 0) &&
-       (strcmp("/dev/ttyS1", argv[1]) != 0)))
+  if ((argc < 2))
   {
     printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
     exit(1);
@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 
   /* set input mode (non-canonical, no echo,...) */
   newtio.c_lflag = 0;
-  newtio.c_cc[VTIME] = 0; /* inter-character timer unused */
+  newtio.c_cc[VTIME] = 30; /* inter-character timer unused */
   newtio.c_cc[VMIN] = 5;  /* blocking read until 5 chars received */
 
   /* 
@@ -73,13 +73,13 @@ int main(int argc, char **argv)
   printf("New termios structure set\n");
 
   State curr_state = START;
-
-  while (curr_state != STOP)
+  while (curr_state != STOP_STATE)
   { /* loop for input */
-    res = read(fd, buf, 1);
-    printf("%s\n", buf);
+    res = read(fd, buf, 5);
+    printf("%x\n", buf[0]);
     printf("%d bytes recieved\n", res);
     curr_state = changeState(buf[0], curr_state, msg);
+    printf("current state = %d\n",curr_state );
   }
   msg[0] = FLAG;
   msg[1] = A_RECETOR;

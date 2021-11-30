@@ -5,7 +5,10 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <stdio.h>
-#include "common.h"
+#include <stdlib.h>
+#include <unistd.h>
+#include <strings.h>
+#include "../common/common.h"
 #define BAUDRATE B38400
 #define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
@@ -25,14 +28,11 @@ char msg[5];
 
 int main(int argc, char** argv)
 {
-    int fd,c, res;
+    int fd, res;
     struct termios oldtio,newtio;
-    char buf[255];
     //int i, sum = 0, speed = 0;
     
-    if ( (argc < 2) || 
-  	     ((strcmp("/dev/ttyS10", argv[1])!=0) && 
-  	      (strcmp("/dev/ttyS11", argv[1])!=0) )) {
+    if ((argc < 2)) {
       printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
       exit(1);
     }
@@ -60,7 +60,7 @@ int main(int argc, char** argv)
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */
+    newtio.c_cc[VTIME]    = 30;   /* inter-character timer unused */
     newtio.c_cc[VMIN]     = 5;   /* blocking read until 5 chars received */
 
 
@@ -89,7 +89,9 @@ int main(int argc, char** argv)
     msg[2] = C_SET;
     msg[3] = msg[1] ^ msg[2];
     msg[4] =  FLAG;
-    res = write(fd,msg,sizeof(msg));   
+
+    //res = write(fd,msg,sizeof(msg));   
+    res = write(fd, msg, 1);
     printf("%d bytes written\n", res);
  
 
@@ -97,7 +99,6 @@ int main(int argc, char** argv)
     O ciclo FOR e as instru��es seguintes devem ser alterados de modo a respeitar 
     o indicado no gui�o 
   */
-
 
 
     sleep(2);
@@ -109,11 +110,13 @@ int main(int argc, char** argv)
 
     currentState = START;
     //READ UA pls
-    char *byte;
+    char byte[100];
     while (STOP==FALSE) {     
-      res = read(fd,byte,1);   
-      char byteV = *byte;
-      currentState = changeState(byteV,currentState, msg);
+      printf("currentState %d\n", currentState);
+      res = read(fd,byte,1);
+
+      currentState = changeState(byte[0],currentState, msg);
+      printf("currentState %d\n", currentState);
       if(currentState == STOP_STATE){
         printf("Success!");
         if(msg[2] == C_UA){
@@ -122,7 +125,6 @@ int main(int argc, char** argv)
         
         break;
       }
-      if (buf[0]=='\0') STOP=TRUE;
     }
     
 
