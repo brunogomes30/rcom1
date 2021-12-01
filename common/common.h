@@ -25,6 +25,7 @@ typedef enum  {DATA, CONTROL, ERROR} MessageType;
 typedef struct {
     MessageType type;
     char *data;
+    int nBytes;
     int s;
 } MessageInfo;
 
@@ -32,11 +33,13 @@ typedef struct {
     unsigned char s;
     
 } ApplicationData;
-int isC(char byte);
+
+void printBuffer(unsigned char * buffer, unsigned size);
+int isC(char byte, char S);
 int checkBCC(char byte, char *msg);
-State changeState(char byte, State currentState, char *msg);
-MessageInfo readMessage(int fd);
-int llopen(char *port, int isTransmitter);
+State changeState(char byte, State currentState, char *msg, char S);
+MessageInfo readMessage(int fd,  ApplicationData *appdata);
+int llopen(char *port, int isTransmitter, ApplicationData *appdata);
 int llclose(int fd, int isTransmitter, ApplicationData *appdata);
 int llread(int fd, char *buffer,  ApplicationData *applicationData);
 int llwrite(int fd, char *buffer, int length);

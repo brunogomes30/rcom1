@@ -130,16 +130,17 @@ int main(int argc, char** argv)
 //   }
   
   printf("calling llopen writer\n");
-  fd = llopen(argv[1], 1);
+  ApplicationData appdata;
+  appdata.s = 0;
+  fd = llopen(argv[1], 1, &appdata);
   if(fd == -1){
     //f
     exit(-1);
   }
   char * filePath = "./pinguin.gif";
-  ApplicationData appdata;
-  appdata.s = 0;
+  
+  
   writeFile(fd, filePath, &appdata);
-
   llclose(fd, 1, &appdata);
   
   //close(fd);
