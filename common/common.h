@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #define FLAG  0b01111110
 #define A_EMISSOR  0b00000011
@@ -24,7 +25,7 @@ typedef enum  {START, FLAG_RECV, A_RECV, C_RECV, BCC_OK, STOP_STATE} State;
 typedef enum  {DATA, CONTROL, ERROR} MessageType;
 typedef struct {
     MessageType type;
-    char *data;
+    unsigned char *data;
     int nBytes;
     int s;
 } MessageInfo;
@@ -35,16 +36,16 @@ typedef struct {
 } ApplicationData;
 
 void printBuffer(unsigned char * buffer, unsigned size);
-int isC(char byte, char S);
-int checkBCC(char byte, char *msg);
-State changeState(char byte, State currentState, char *msg, char S);
+int isC(unsigned char byte, char S);
+int checkBCC(unsigned char byte, unsigned char *msg);
+State changeState(unsigned char byte, State currentState, unsigned char *msg, char S);
 MessageInfo readMessage(int fd,  ApplicationData *appdata);
 int llopen(char *port, int isTransmitter, ApplicationData *appdata);
 int llclose(int fd, int isTransmitter, ApplicationData *appdata);
 int llread(int fd, char *buffer,  ApplicationData *applicationData);
-int llwrite(int fd, char *buffer, int length);
-int writeData(int fd, char *data, int nBytes,  ApplicationData *applicationData);
-int readData(int fd, char *data, State *state);
+int llwrite(int fd, unsigned char *buffer, int length);
+int writeData(int fd, unsigned char *data, int nBytes,  ApplicationData *applicationData);
+int readData(int fd, unsigned char *data, State *state);
 void writeMessage(int fd, unsigned char address, unsigned char C);
 int writeFile(int fd, char* path,  ApplicationData *applicationData);
 

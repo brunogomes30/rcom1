@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-int isC(char byte, char S){
+int isC(unsigned char byte, char S){
   return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR || byte == C_REJ || byte == S;
 }
 
@@ -14,7 +14,7 @@ void printBuffer(unsigned char * buffer, unsigned size){
   printf("\n");
 }
 
-int checkBCC(char byte, char *msg){
+int checkBCC(unsigned char byte, unsigned char *msg){
   return byte == (msg[2] ^ msg[1]);
   
 }
@@ -112,8 +112,8 @@ int llread(int fd, char *buffer, ApplicationData *appdata){
   return 0;
 }
 
-int llwrite(int fd, char *data, int length){
-  char buffer[2];
+int llwrite(int fd, unsigned char *data, int length){
+  unsigned char buffer[2];
   unsigned nBytes = 0;
   for(int i=0;i<length; i++){
     
@@ -140,8 +140,7 @@ int llwrite(int fd, char *data, int length){
 
 
 
-State changeState(char byte, State currentState, char *msg, char S){
-  printf("State %x: %d",byte,  currentState);
+State changeState(unsigned char byte, State currentState, unsigned char *msg, char S){
   switch(currentState){
     case START:
       if(byte == FLAG){
@@ -193,7 +192,6 @@ State changeState(char byte, State currentState, char *msg, char S){
     case STOP_STATE:
       break;
   }
-  printf(" -> %d\n", currentState);
   return currentState;
 }
 
@@ -219,7 +217,7 @@ int writeFile(int fd, char *path, ApplicationData *applicationData){
     if(path[i] == '/') filename = path + 1 + i;
   }
   int filenameSize = strlen(filename);
-  char buffer[MAX_SIZE];
+  unsigned char buffer[MAX_SIZE];
   stat(path, &st);
   printf("path = %s\n", path);
   long unsigned  filelen = st.st_size;
@@ -234,10 +232,10 @@ int writeFile(int fd, char *path, ApplicationData *applicationData){
 
 
   //for now
-  unsigned char numberOfBytes = 1;
+  unsigned char numberOfBytes = 4;
   buffer[nBytes++] = numberOfBytes; //Number of bytes - L
   for(unsigned char i=0; i< numberOfBytes; i++){
-    buffer[nBytes++] = (filelen >> 8 * i) & 0xff;
+    buffer[nBytes++] = (filelen >> (8 * i)) & 0xff;
   }
 
   buffer[nBytes++] = 0x1; // Filename
@@ -264,7 +262,7 @@ int writeFile(int fd, char *path, ApplicationData *applicationData){
   unsigned bytesSent = 0;
   unsigned char seq = 0;
   unsigned char fileData[PACKET_SIZE];
-  int fileFD = open(path, "rb");
+  FILE* fileFD = fopen(path, "rb");
   while(bytesSent < numberOfBytes){
     nBytes = 0;
     buffer[nBytes++] = 0x1;
@@ -280,7 +278,7 @@ int writeFile(int fd, char *path, ApplicationData *applicationData){
       if(bytesSent == numberOfBytes){
         break;
       }
-      read(fileFD, fileData[bytesSentInThisPacket++], 1);
+      fread(fileData + bytesSentInThisPacket, 1, 1, fileFD);
       bytesSent++;
     }
     buffer[nBytes++] = (PACKET_SIZE >> 8) & 0xFF;
@@ -291,6 +289,7 @@ int writeFile(int fd, char *path, ApplicationData *applicationData){
     
 
     writeData(fd, buffer, nBytes, applicationData);
+    printf("Sent data packet\n");
     
     //Read UA
     MessageInfo info = readMessage(fd, applicationData);
@@ -308,13 +307,13 @@ int writeFile(int fd, char *path, ApplicationData *applicationData){
   
   buffer[0] = 3;
   writeData(fd, buffer, 1, applicationData);
-  close(fileFD);
+  fclose(fileFD);
   
   return 0;
 
 }
 
-int writeData(int fd, char *data, int nBytes, ApplicationData *appdata){
+int writeData(int fd, unsigned char *data, int nBytes, ApplicationData *appdata){
   unsigned char buffer[nBytes * 2 + 6];
   int i = 0;
   printf("S = %d\n", appdata->s);
@@ -353,7 +352,7 @@ MessageInfo readMessage(int fd, ApplicationData *appdata){
   int i=0;
   unsigned char auxBuf[2], msg[5];
   State state = START;
-  char data[MAX_SIZE];
+  unsigned char data[MAX_SIZE];
   MessageInfo messageInfo;
   messageInfo.s = -1;
   int res = 0;
@@ -381,17 +380,15 @@ MessageInfo readMessage(int fd, ApplicationData *appdata){
           break;
           //PASSAR COMO ARGUMENTO???????????
         }
-        printf("Aqui \n");
         messageInfo.type = DATA;
-        messageInfo.data = (char *) malloc(1 * nBytes);
+        messageInfo.data = (unsigned char *) malloc(1 * nBytes);
         messageInfo.nBytes = nBytes;
         for(int j=0; j<nBytes; j++){
           messageInfo.data[j] = data[j];
         }
-        printf("Certo=?\n");
       } else {
         messageInfo.type = CONTROL;
-        messageInfo.data = (char *) malloc(1);
+        messageInfo.data = (unsigned char *) malloc(1);
         messageInfo.nBytes = 1;
         messageInfo.data[0] = msg[i - 1];
       }
@@ -405,7 +402,7 @@ MessageInfo readMessage(int fd, ApplicationData *appdata){
   return messageInfo;
 }
 
-int readData(int fd, char *data, State *state){
+int readData(int fd, unsigned char *data, State *state){
   char auxBuf[2];
   char skipRead = 0;
   int res;

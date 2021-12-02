@@ -45,20 +45,18 @@ int main(int argc, char **argv)
   */
  MessageInfo info;
  char *filename;
- long size = 0;
- int newFD;
+ long unsigned size = 0;
+ FILE* newFD;
  unsigned char nSeq = 0;
   do{
     //wait for file
-    printf("waiting for something\n");
     info = readMessage(fd, &appdata);
     if(info.type == DATA){
       printf("IT's data");
       //It's control packet
       if(info.data[0] != 1){
         if(info.data[0] == 3){
-          printf("END CONTROL PACKET, FILE SHOULD BE CREATED");
-          close(newFD);
+          fclose(newFD);
           return 1;
         }
         unsigned char i=1;
@@ -67,7 +65,7 @@ int main(int argc, char **argv)
           //printf("--%d\n", i);
           if(info.data[i] == 0){
             unsigned char nChars = info.data[i + 1];
-            for(unsigned char j=0; j < nChars; j++){
+            for(char j=nChars - 1; j >=0; j--){
               size = (size<<8) + info.data[i + 2 + j];
             }
             i+= nChars + 2;
@@ -82,21 +80,23 @@ int main(int argc, char **argv)
           }
         }
         printf("Filename = %s\n", filename);
-        printf("Filesize = %ld\n", size);
+        printf("Filesize = %lu\n", size);
         //Create file
-        newFD = open(filename, "w+");
+        newFD = fopen(filename, "w+");
         nSeq = 0;
       } else if(info.data[0] == 1){
         //It's file data
+        printf("Passou aqui1?\n");
         nSeq = (nSeq + 1) % 255;
         if(nSeq != info.data[1]){
-          printf("Fuck this\n");
         }
         unsigned numberOfChars = (info.data[1] << 8) + info.data[2];
         for(unsigned i=0; i < numberOfChars; i++){
-          write(newFD, info.data[3 + i], 1);
+          fwrite(info.data + 3 + i, 1 , 1, newFD);
         }
+        printf("Passou aqui? 2\n");
       }
+      
       writeMessage(fd, A_EMISSOR, C_RR + (appdata.s == 1 ? BIT(6): 0));
     } else if(info.type == CONTROL && info.data[0] == C_DISC){
       printf("IT's a disc");

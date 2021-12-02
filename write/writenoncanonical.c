@@ -137,7 +137,7 @@ int main(int argc, char** argv)
     //f
     exit(-1);
   }
-  char * filePath = "./pinguin.gif";
+  char * filePath = "./pinguim.gif";
   
   
   writeFile(fd, filePath, &appdata);
