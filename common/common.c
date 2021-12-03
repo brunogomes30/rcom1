@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <stdio.h>
 int isC(unsigned char byte, char S){
-  return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR || byte == C_REJ || byte == S;
+  return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR(S) || byte == C_REJ(S) || byte == (S == 1 ? BIT(6) : 0);
 }
 
 void printBuffer(unsigned char * buffer, unsigned size){
@@ -134,7 +134,7 @@ int llwrite(int fd, unsigned char *data, int length){
   }
   buffer[0] = data[nBytes-1] ^ data[nBytes - 2];
   write(fd, buffer, 1);
-  printf("Finish writing");
+  printf("Finish writing \n");
   return 0;
 }
 
@@ -160,6 +160,7 @@ State changeState(unsigned char byte, State currentState, unsigned char *msg, ch
       }
       break;
     case A_RECV:
+      printf("S = %d %x\n", S, byte);
       if(isC(byte, S)){
         currentState = C_RECV;
         msg[2] = byte;
@@ -203,6 +204,7 @@ void writeMessage(int fd, unsigned char address, unsigned char C){
   msg[3] = msg[1] ^ msg[2];
   msg[4] =  FLAG;
   //llwrite(fd, msg, 5);
+  printf("---Write %x \n", C);
   write(fd, msg, 5);
 }
 
@@ -245,66 +247,70 @@ int writeFile(int fd, char *path, ApplicationData *applicationData){
   }
   printf("beforeWirteData\n");
   
-  printBuffer(buffer, nBytes);
   writeData(fd, buffer, nBytes, applicationData);
-
   MessageInfo info = readMessage(fd, applicationData);
   if(info.type == ERROR){
     return -1;
   }
-  if(info.s != -1){
-    applicationData->s = info.s != applicationData->s ? info.s : applicationData->s;
-  }
+  
+  applicationData->s = info.s;
   
 
   //Write data
   unsigned PACKET_SIZE = 100; // max  = 65535
-  unsigned bytesSent = 0;
+  unsigned long bytesSent = 0;
   unsigned char seq = 0;
   unsigned char fileData[PACKET_SIZE];
+  
   FILE* fileFD = fopen(path, "rb");
-  while(bytesSent < numberOfBytes){
+  while(bytesSent < filelen){
     nBytes = 0;
     buffer[nBytes++] = 0x1;
     buffer[nBytes++] = seq;
     seq = (seq + 1) % 255;
-    int numberOfBytes = filelen;
-    
-    buffer[nBytes + 1] = numberOfBytes & 0xff;
-    buffer[nBytes] = (numberOfBytes >> 8) & 0xff;
+    unsigned bytesSentInThisPacket;
+    if(bytesSent + MAX_PER_PACKET > filelen){
+      bytesSentInThisPacket = filelen - bytesSent;
+    } else {
+      bytesSentInThisPacket = MAX_PER_PACKET;
+    }
+    printf("Byte in this packet = %u\n", bytesSentInThisPacket);
+    buffer[nBytes + 1] = bytesSentInThisPacket & 0xff;
+    buffer[nBytes] = (bytesSentInThisPacket >> 8) & 0xff;
     nBytes += 2;
-    unsigned bytesSentInThisPacket = 0;
-    for(unsigned i=0;i < PACKET_SIZE; i++){
+    
+    for(unsigned i=0;i < bytesSentInThisPacket; i++){
       if(bytesSent == numberOfBytes){
-        break;
+        break; // Tirar depois probably
       }
-      fread(fileData + bytesSentInThisPacket, 1, 1, fileFD);
+      fread(fileData + i, 1, 1, fileFD);
       bytesSent++;
     }
-    buffer[nBytes++] = (PACKET_SIZE >> 8) & 0xFF;
-    buffer[nBytes++] =  PACKET_SIZE & 0xFF;
     for(unsigned i=0; i< bytesSentInThisPacket; i++){
       buffer[nBytes++] = fileData[i];
     }
     
-
     writeData(fd, buffer, nBytes, applicationData);
     printf("Sent data packet\n");
     
     //Read UA
+    printf("not expecting S = %d", applicationData->s);
     MessageInfo info = readMessage(fd, applicationData);
     if(info.type == ERROR){
+      printf("Error detected??\n");
       return -1;
       //Try again
     }
-    if(info.type == CONTROL && info.data[0] == C_RR && info.s != applicationData->s && info.s != -1){
+    if(info.type == CONTROL && info.data[0] == C_RR(applicationData->s) && info.s != applicationData->s && info.s != -1){
       //good
       applicationData->s = info.s; // Switch S
     } else {
+      printf("Message not rr type = %d, data = %x, s = %d -> appData.s = %d\n", info.type, info.data[0], info.s, applicationData->s);
       //Try again
     }
+    printf("bytes Sent = %lu/%lu\n", bytesSent, filelen);
   }
-  
+  printf("Saiu do while\n");
   buffer[0] = 3;
   writeData(fd, buffer, 1, applicationData);
   fclose(fileFD);
@@ -314,9 +320,9 @@ int writeFile(int fd, char *path, ApplicationData *applicationData){
 }
 
 int writeData(int fd, unsigned char *data, int nBytes, ApplicationData *appdata){
+  printf("Send data S=%d\n", appdata->s);
   unsigned char buffer[nBytes * 2 + 6];
   int i = 0;
-  printf("S = %d\n", appdata->s);
   buffer[i++] = FLAG; // Flag
   buffer[i++] = A_EMISSOR; // A
   buffer[i++] = appdata->s == 1 ? BIT(6) : 0; // C 
@@ -349,6 +355,7 @@ int writeData(int fd, unsigned char *data, int nBytes, ApplicationData *appdata)
 
 
 MessageInfo readMessage(int fd, ApplicationData *appdata){
+  char expectedS = appdata->s != 1;
   int i=0;
   unsigned char auxBuf[2], msg[5];
   State state = START;
@@ -367,14 +374,14 @@ MessageInfo readMessage(int fd, ApplicationData *appdata){
     if(res == 0){
       perror("EOF");
     }
-    state = changeState(auxBuf[0], state, msg, appdata->s);
+    state = changeState(auxBuf[0], state, msg, expectedS);
     if(state == BCC_OK){
       if(msg[2] == BIT(6) || msg[2] == 0) {
         //It's data
         printf("Detected Data\n");
         messageInfo.s = msg[1] == BIT(6);
         int nBytes = readData(fd, data, &state);
-        appdata->s = (auxBuf[0] & BIT(6)) >> 6;
+        printf("nBytes = %d\n", nBytes);
         if(state != STOP_STATE) {
           messageInfo.type = ERROR;
           break;
@@ -391,6 +398,12 @@ MessageInfo readMessage(int fd, ApplicationData *appdata){
         messageInfo.data = (unsigned char *) malloc(1);
         messageInfo.nBytes = 1;
         messageInfo.data[0] = msg[i - 1];
+        messageInfo.s = (messageInfo.data[0] & BIT(8)) != BIT(8);
+        if(msg[i - 1] == C_SET || msg[i - 1] == C_DISC || msg[i - 1] == C_UA){
+
+        } else {
+          //appdata->s = messageInfo.s;
+        }
       }
 
     }
@@ -398,6 +411,7 @@ MessageInfo readMessage(int fd, ApplicationData *appdata){
       break;
     }
     msg[i++] = auxBuf[0]; 
+    
   }
   return messageInfo;
 }

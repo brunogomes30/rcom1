@@ -48,11 +48,16 @@ int main(int argc, char **argv)
  long unsigned size = 0;
  FILE* newFD;
  unsigned char nSeq = 0;
-  do{
+ appdata.s = 0;
+  do{      
+    printf("||| Non S = %d\n", appdata.s);
     //wait for file
+    appdata.s = appdata.s != 1;
     info = readMessage(fd, &appdata);
+    appdata.s = appdata.s != 1;
     if(info.type == DATA){
       printf("IT's data");
+      appdata.s = appdata.s != 1;
       //It's control packet
       if(info.data[0] != 1){
         if(info.data[0] == 3){
@@ -86,7 +91,6 @@ int main(int argc, char **argv)
         nSeq = 0;
       } else if(info.data[0] == 1){
         //It's file data
-        printf("Passou aqui1?\n");
         nSeq = (nSeq + 1) % 255;
         if(nSeq != info.data[1]){
         }
@@ -94,10 +98,9 @@ int main(int argc, char **argv)
         for(unsigned i=0; i < numberOfChars; i++){
           fwrite(info.data + 3 + i, 1 , 1, newFD);
         }
-        printf("Passou aqui? 2\n");
       }
-      
-      writeMessage(fd, A_EMISSOR, C_RR + (appdata.s == 1 ? BIT(6): 0));
+      printf("send C_RR S=%d\n", appdata.s);
+      writeMessage(fd, A_EMISSOR, C_RR(appdata.s));
     } else if(info.type == CONTROL && info.data[0] == C_DISC){
       printf("IT's a disc");
       writeMessage(fd, A_RECETOR, C_DISC);

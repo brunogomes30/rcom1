@@ -11,10 +11,11 @@
 #define C_SET  0b00000011
 #define C_DISC  0b00001011
 #define C_UA  0b00000111
-#define C_RR  0b00000101
-#define C_REJ  0b00000001
+#define C_RR(S)  (0x5 |  (S << 7))
+#define C_REJ(S)  (0x1 | (S << 7))
 #define ESCAPE 0b01111110
-#define MAX_SIZE 100
+#define MAX_PER_PACKET 100
+#define MAX_SIZE 200
 #define BIT(n) 1 << n
 
 #define BAUDRATE B38400
@@ -27,6 +28,7 @@ typedef struct {
     MessageType type;
     unsigned char *data;
     int nBytes;
+    unsigned dataSize;
     int s;
 } MessageInfo;
 
