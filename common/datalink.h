@@ -2,6 +2,21 @@
 
 
 /**
+ * @brief Returns fd
+ * 
+ * @return int 
+ */
+int llopen(char *port, int isTransmitter);
+
+/**
+ * @brief closes port
+ * 
+ * @return int 
+ */
+int llclose(int fd, int isTransmitter);
+
+
+/**
  * @brief Writes data, until a RR message is received
  * 
  * @param fd 
