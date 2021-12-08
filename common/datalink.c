@@ -41,7 +41,7 @@ int llopen(char *port, int isTransmitter)
 
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 30; /* inter-character timer unused */
+    newtio.c_cc[VTIME] = 5; /* inter-character timer unused */
     newtio.c_cc[VMIN] = 0;  /* blocking read until 5 chars received */
 
     tcflush(fd, TCIOFLUSH);
@@ -55,28 +55,32 @@ int llopen(char *port, int isTransmitter)
 
     MessageInfo info;
     info.type = DATA;
-    if (isTransmitter)
-    {   
-        unsigned tries = 0;
-        do{
-        writeMessage(fd, A_EMISSOR, C_SET);
-        info = readMessage(fd);
-        if(info.type == ERROR){
-            tries++;
-        } else {
-            break;
+    unsigned tries = 0, maxtries = 3;
+    do{
+        if (isTransmitter)
+        {   
+            
+            
+            writeMessage(fd, A_EMISSOR, C_SET);
+            info = readMessage(fd);
+            if(info.type == ERROR){
+                tries++;
+            } else {
+                break;
+            }
+            
         }
-        }while(tries < 3);
-        // printf("Aqui??\n");
-        // printf("Message info = %p", &info);
-    }
-    else {
-        info = readMessage(fd);
-        if (info.type == CONTROL && info.data[0] == C_SET) {
-            writeMessage(fd, A_EMISSOR, C_UA);
+        else {
+            info = readMessage(fd);
+            if (info.type == CONTROL && info.data[0] == C_SET) {
+                writeMessage(fd, A_EMISSOR, C_UA);
+                break;
+            } else {
+                tries++;
+            }
         }
-    }
-    if (info.type == ERROR)
+    }while(tries < maxtries);
+    if (info.type == ERROR || tries == 3)
     {
         return -1;
     }
@@ -220,12 +224,12 @@ MessageInfo readMessage(int fd)
     unsigned stuffedDataSize = 0;
     MessageInfo info;
     unsigned tries = 0;
-    while (state != STOP_STATE && tries < 1)
+    while (state != STOP_STATE && tries < 5)
     {
         int res = read(fd, buffer + (bufferSize), 1);
         if (res == 0)
         {
-            printf("timeout? %d\n", tries);
+            //printf("timeout? %d\n", tries);
             tries++;
         }
         // Verificar timeout com o res
@@ -295,9 +299,12 @@ MessageInfo readMessage(int fd)
     } else {
         givenBCC = buffer[stuffedDataSize + 5];
     }
+    /*
+    //Used to create random errors
     if(rand() % 30 == 0){
         givenBCC -= 1;
     }
+    */
     unsigned dataSize = unstuffData(stuffedData, data, stuffedDataSize, givenBCC);
     if (dataSize == -1)
     {

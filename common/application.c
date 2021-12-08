@@ -1,13 +1,15 @@
 #include "application.h"
 #include "datalink.h"
+#include <time.h>
 
 int writeFile(char *file, char *port){
-    printf("Openning port...\n");
+    printf("Establishing connection with receiver...\n");
     int fd = llopen(port, 1);
     if(fd == -1){
+        printf("Couldn't established connection with receiver\n");
         return -1;
     }
-    printf("Opened succesfully\n");
+    printf("Established connection with receiver\n");
     printf("Writing control Packet...\n");
     FileData fileData = readFileData(file);
     
@@ -39,6 +41,7 @@ int writeFile(char *file, char *port){
             res = writeData(fd, dataPacket, dataPacketSize);
             if(res == -1){
                 printf("#### trying again\n");
+                ntries++;
                 continue;
             } else {
                 break;
@@ -123,9 +126,13 @@ unsigned int writeDataPacket(unsigned char *dataPacket , unsigned char* data, un
 
 int readFile(char * port){
     unsigned S = 0;
-    printf("openning port\n");
+    printf("Establishing connection with transmiter...\n");
     int fd = llopen(port, 0);
-    printf("opened successfully\n");
+    if(fd == -1){
+        printf("Couldn't establish connection with transmitter\n");
+        return -1;
+    }
+    printf("Established connection with transmitter\n");
 
     //unsigned char buffer[MAX_SIZE];
     //unsigned long filelen = 0;
@@ -133,13 +140,15 @@ int readFile(char * port){
     FileData fileDataStart, fileDataEnd;
     FILE* fileFD;
     MessageInfo info;
+      struct timespec tbegin={0,0}, tend={0,0};
+    clock_gettime(CLOCK_MONOTONIC, &tbegin);
     while(!finished){
         printf("######Ready to read next data...\n\n");
         unsigned tries = 0;
         do{
             info = readMessage(fd);
             if(info.type != DATA){
-                printf("Ocorreu um erro\n");
+                printf("An error has occured while reading message\n");
                 writeMessage(fd, A_EMISSOR, C_REJ(S));
                 tries++;
             }else {
@@ -153,9 +162,6 @@ int readFile(char * port){
         writeMessage(fd, A_EMISSOR, C_RR(S));
         switch(info.data[0]){
             case 1:
-                //printf("case 1\n\n");
-                //Data packet
-                //printBuffer(info.data + 4, info.dataSize - 4);
                 writeToFile(info.data + 4, info.dataSize - 4, fileDataStart);
                 break;
             case 2:
@@ -167,9 +173,6 @@ int readFile(char * port){
             case 3:
                 //Control packet end
                 fileDataEnd = readControlPacket(info.data, info.dataSize);
-
-
-                //aqui comparar com o fileDataStart
                 finished = 1;
                 break;
         }
@@ -177,12 +180,17 @@ int readFile(char * port){
     }
 
     if(fileDataEnd.filelen != fileDataStart.filelen){
-        printf("error control packet end and begin\n");
+        printf("error control packet end and control packet begin don't match\n");
         return -1;
     }
+    clock_gettime(CLOCK_MONOTONIC, &tend);
+    printf("Calcular bloat\n");
+    double averageSpeed = (double) fileDataStart.filelen / ( ((double) tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double) tbegin.tv_sec + 1.0e-9*tbegin.tv_nsec)  );
+    printf("Bloat calculado\nAverage speed = %.5f\n", averageSpeed);
     printf("Closing port...\n");
     llclose(fd, 0);
     printf("Successfully closed port\n");
+
     return 0;
 }
 
