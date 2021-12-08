@@ -20,6 +20,7 @@ void printBuffer(unsigned char *buffer, unsigned size)
 int llopen(char *port, int isTransmitter)
 {
     int fd = open(port, O_RDWR | O_NOCTTY);
+    printf("fd = %d\n", fd);
     if (fd < 0)
     {
         perror(port);
@@ -41,8 +42,8 @@ int llopen(char *port, int isTransmitter)
 
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 30; /* inter-character timer unused */
-    newtio.c_cc[VMIN] = 0;  /* blocking read until 5 chars received */
+    newtio.c_cc[VTIME] = 3; /* inter-character timer unused */
+    newtio.c_cc[VMIN] = 1;  /* blocking read until 5 chars received */
 
     tcflush(fd, TCIOFLUSH);
 
@@ -52,32 +53,35 @@ int llopen(char *port, int isTransmitter)
         exit(-1);
     }
 
+    printf("New termios structure set\n");
 
     MessageInfo info;
     info.type = DATA;
     if (isTransmitter)
-    {   
-        unsigned tries = 0;
-        do{
+    {
+        printf("Writing message transmitter\n");
         writeMessage(fd, A_EMISSOR, C_SET);
+        printf("Reading message transmitter\n");
         info = readMessage(fd);
-        if(info.type == ERROR){
-            tries++;
-        } else {
-            break;
-        }
-        }while(tries < 3);
         // printf("Aqui??\n");
         // printf("Message info = %p", &info);
     }
-    else {
+    else
+    {
+        printf("Reading message receiver\n");
         info = readMessage(fd);
-        if (info.type == CONTROL && info.data[0] == C_SET) {
+        printf("Read message done\n");
+
+        printf("info.data[0] = %x ", info.type);
+        if (info.type == CONTROL && info.data[0] == C_SET)
+        {
+            printf("Sending UA\n");
             writeMessage(fd, A_EMISSOR, C_UA);
         }
     }
     if (info.type == ERROR)
     {
+        printf("ERRO no read message");
         return -1;
     }
     return fd;
@@ -89,12 +93,17 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
 {
     unsigned char dataFrame[MAX_SIZE];
     unsigned dataFrameSize = buildDataFrame(data, nBytes, dataFrame);
+    printf("Write data\n");
     // buildDataFrame(data, nBytes, dataFrame);
     unsigned tries = 0;
     unsigned char exitWhile = 0;
     while (tries < 5)
     {
+        printf("Write %d bytes with S = %d\n", dataFrameSize, S);
         write(fd, dataFrame, dataFrameSize);
+        //printf("Wrote\n");
+        printBuffer(dataFrame, dataFrameSize);
+        printf("\n\n");
         S = S == 1 ? 0 : 1;
         MessageInfo info = readMessage(fd);
         S = S == 1 ? 0 : 1;
@@ -105,14 +114,13 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
             tries++;
             break;
         case CONTROL:
+            printf("Entoru aqui");
             if (info.data[0] == C_RR(S == 1 ? 0 : 1))
             {
+                //printf("Mas não aqui\n");
+                printf("message gave us S = %u [%x]\n", S, info.data[0]);
                 S = info.s;
                 exitWhile = 1;
-            }else {
-                info.s = S;
-                info.data[0] = C_REJ(S == 1 ? 0 : 1);
-                return -1;
             }
             break;
         case DATA:
@@ -121,7 +129,7 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
         }
         if (exitWhile)
             break;
-        //free(info.data);
+        
     }
 
     if (tries == 5)
@@ -139,6 +147,7 @@ unsigned buildDataFrame(unsigned char *data, unsigned nBytes, unsigned char *dat
 
     buffer[0] = FLAG;
     buffer[1] = A_EMISSOR;
+    printf("Wrote with S = %d\n", S);
     buffer[2] = S == 1 ? BIT(6) : 0;
     buffer[3] = buffer[1] ^ buffer[2];
 
@@ -152,23 +161,10 @@ unsigned buildDataFrame(unsigned char *data, unsigned nBytes, unsigned char *dat
     {
         bcc = bcc ^ data[i];
     }
-    if(bcc != FLAG){
-        buffer[bufferSize++] = bcc;
-    } else {
-        buffer[bufferSize++] = ESCAPE;
-        buffer[bufferSize++] = 0x5e;
-    }
+
+    buffer[bufferSize++] = bcc;
     buffer[bufferSize++] = FLAG;
     memcpy(dataFrame, buffer, bufferSize);
-
-    /*
-    unsigned char unstuffedData[300];
-    unstuffData(buffer + dataFrameSize, unstuffedData, stuffedDataSize, bcc);
-    for(unsigned i=0; i < nBytes; i++){
-        if(data[i] != unstuffedData[i])
-            printf("Stuffed = %x, Unstuffed = %x \n", buffer[dataFrameSize + i], unstuffedData[i]);
-    }
-    */
     return bufferSize;
 }
 
@@ -177,22 +173,24 @@ unsigned stuffData(unsigned char *data, unsigned nBytes, unsigned char *stuffedD
     unsigned stuffedSize = 0;
     for (int i = 0; i < nBytes; i++)
     {
-        if (data[i] == FLAG) {
+        if (data[i] == FLAG)
+        {
             stuffedData[stuffedSize++] = ESCAPE;
-            stuffedData[stuffedSize++] = 0x5e;
+            stuffedData[stuffedSize++] = FLAG ^ 0x20;
             // write(fd, stuffedData, 2);
         }
-        else if (data[i] == ESCAPE) {
+        else if (data[i] == ESCAPE)
+        {
             stuffedData[stuffedSize++] = ESCAPE;
-            stuffedData[stuffedSize++] = 0x5d;
+            stuffedData[stuffedSize++] = ESCAPE ^ 0x20;
             // write(fd, stuffedData, 2);
         }
-        else {
+        else
+        {
             // write(fd, stuffedData + i, 1);
             stuffedData[stuffedSize++] = data[i];
         }
     }
-
     return stuffedSize;
 }
 
@@ -219,24 +217,28 @@ MessageInfo readMessage(int fd)
     // unsigned isData = 0;
     unsigned stuffedDataSize = 0;
     MessageInfo info;
-    unsigned tries = 0;
-    while (state != STOP_STATE && tries < 1)
+    //State previousState = START;
+    while (state != STOP_STATE)
     {
         int res = read(fd, buffer + (bufferSize), 1);
-        if (res == 0)
+        if (res == -1)
         {
-            printf("timeout? %d\n", tries);
-            tries++;
+            printf("timeout?\n");
         }
         // Verificar timeout com o res
 
+        // printf("State = %d bufferSize = %u, read %x\n", state, bufferSize, buffer[bufferSize]);
         if (!(state == BCC_OK && info.type == DATA))
             state = changeState(buffer[bufferSize], state, buffer, S);
-        else if (buffer[bufferSize] == FLAG) {
+        else if (buffer[bufferSize] == FLAG)
+        {
             state = STOP_STATE;
             break;
         }
-        if (state == FLAG_RECV) {
+        // printf("Changed to %d\n\n", state);
+        //previousState = state;
+        if (state == FLAG_RECV)
+        {
             buffer[0] = FLAG;
             bufferSize = 1;
             stuffedDataSize = 0;
@@ -250,12 +252,16 @@ MessageInfo readMessage(int fd)
         {
             unsigned isData = buffer[bufferSize] == (S == 1 ? BIT(6) : 0);
             info.type = isData ? DATA : CONTROL;
-            if (info.type == CONTROL) {
+            if (info.type == CONTROL)
+            {
                 info.s = (buffer[2] & BIT(7)) == BIT(7) ? 1 : 0;
             }
             else {
                 info.s = buffer[bufferSize] == BIT(6) ? 1 : 0;
+                printf("Está a calcular o S apartir daqui %d [%x]\n", info.s, buffer[bufferSize]);
+                printBuffer(buffer, bufferSize);
             }
+            printf("isData= %d\n", isData);
         }
         if (state == BCC_OK)
         {
@@ -272,6 +278,7 @@ MessageInfo readMessage(int fd)
         }
         bufferSize++;
     }
+    printf("##############\n");
 
     if (state != STOP_STATE)
     {
@@ -289,20 +296,10 @@ MessageInfo readMessage(int fd)
     stuffedDataSize -= 2;
     memcpy(stuffedData, buffer + 5, stuffedDataSize);
     unsigned char data[stuffedDataSize];
-    unsigned char givenBCC;
-    if(buffer[stuffedDataSize + 5] == 0x5e){
-        givenBCC = buffer[stuffedDataSize + 4] == 0x7d ? FLAG : 0x5e;
-    } else {
-        givenBCC = buffer[stuffedDataSize + 5];
-    }
-    if(rand() % 30 == 0){
-        givenBCC -= 1;
-    }
-    unsigned dataSize = unstuffData(stuffedData, data, stuffedDataSize, givenBCC);
+    unsigned dataSize = unstuffData(stuffedData, data, stuffedDataSize, buffer[stuffedDataSize + 5]);
     if (dataSize == -1)
     {
         // Try again
-        printf("######\n###Erro no bcc\n######\n");
         info.type = ERROR;
         info.s = S;
         info.dataSize = 0;
@@ -310,7 +307,7 @@ MessageInfo readMessage(int fd)
     }
     info.data = (unsigned char *) malloc(sizeof(unsigned char) * dataSize);
     info.dataSize = dataSize;
-    memcpy(info.data, data, dataSize);
+    memcpy(info.data, stuffedData, stuffedDataSize);
     //S = S == 0 ? 1 : 0;
     //info.s = S;
 
@@ -350,7 +347,8 @@ unsigned unstuffData(unsigned char *stuffedData, unsigned char *data, unsigned s
         {
             printf("Mandou flag na stuffedData#################################################\n");
         }
-        if (!previousIsEscape) {
+        else if (!previousIsEscape)
+        {
             data[dataSize++] = c;
             bcc = bcc ^ c;
             //printf("c = %x \t", c);
@@ -423,6 +421,7 @@ State changeState(unsigned char byte, State currentState, unsigned char *msg, ch
         }
         break;
     case A_RECV:
+        printf("S = %d %x\n", S, byte);
         if (isC(byte, S))
         {
             currentState = C_RECV;
