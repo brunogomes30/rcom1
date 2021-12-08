@@ -217,7 +217,7 @@ MessageInfo readMessage(int fd)
     // unsigned isData = 0;
     unsigned stuffedDataSize = 0;
     MessageInfo info;
-    State previousState = START;
+    //State previousState = START;
     while (state != STOP_STATE)
     {
         int res = read(fd, buffer + (bufferSize), 1);
@@ -236,7 +236,7 @@ MessageInfo readMessage(int fd)
             break;
         }
         // printf("Changed to %d\n\n", state);
-        previousState = state;
+        //previousState = state;
         if (state == FLAG_RECV)
         {
             buffer[0] = FLAG;

@@ -56,14 +56,31 @@ FileData readFileData(char *file){
     char *filename;
     filename = file;
     for(int i=0; file[i] != '\0'; i++){
-        if(file[i] == '/') filename = file + 1 + i;
+        if(file[i] == '/' ) filename = file + 1 + i;
     }
     
-    unsigned filenameSize = strlen(filename);
-    fileData.filenameLen = filenameSize;
+
+    /*
+    char * getFilename(char * path) {
+    char * filename = path, *p;
+    for (p = path; *p; p++) {
+        if (*p == '/' || *p == '\\' || *p == ':') {
+            filename = p;
+        }
+    }
+    return filename;
+}
+*/
+
+
+
+
+    //unsigned filenameSize = strlen(filename);
+    //fileData.filenameLen = filenameSize;
+    fileData.filenameLen = strlen(filename);
     //unsigned char buffer[MAX_SIZE];
     stat(file, &st);
-    fileData.filenameLen = strlen(filename);
+    //fileData.filenameLen = strlen(filename);
     fileData.filename = (char *) malloc(strlen(filename) * 1);
     memcpy(fileData.filename, filename,fileData.filenameLen);
     fileData.filelen = st.st_size;
