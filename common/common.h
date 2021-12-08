@@ -1,3 +1,4 @@
+/*
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -19,7 +20,6 @@
 #define BIT(n) 1 << n
 
 #define BAUDRATE B38400
-
 
 
 typedef enum  {START, FLAG_RECV, A_RECV, C_RECV, BCC_OK, STOP_STATE} State;
@@ -54,3 +54,4 @@ int writeFile(int fd, char* path,  ApplicationData *applicationData);
 
 
 
+*/

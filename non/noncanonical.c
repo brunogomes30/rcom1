@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <unistd.h>
-#include "../common/common.h"
+#include "../common/application.h"
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
@@ -26,86 +26,8 @@ int main(int argc, char **argv)
     printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
     exit(1);
   }
-  ApplicationData appdata;
-  appdata.s = 0;
-  int fd = llopen(argv[1], 0, &appdata);
-  if(fd == -1){
-    return -1;
-  }
-  
-  /*
-  MessageInfo info = readMessage(fd, &appdata);
-  if(info.type == ERROR){
-    printf("ERror");
-    return -1;
-  }
-  if(info.type == CONTROL && info.data[0] == C_SET){
-    writeMessage(fd, A_EMISSOR, C_UA);
-  }
-  */
- MessageInfo info;
- char *filename;
- long unsigned size = 0;
- FILE* newFD;
- unsigned char nSeq = 0;
- appdata.s = 0;
-  do{      
-    printf("||| Non S = %d\n", appdata.s);
-    //wait for file
-    appdata.s = appdata.s != 1;
-    info = readMessage(fd, &appdata);
-    appdata.s = appdata.s != 1;
-    if(info.type == DATA){
-      printf("IT's data");
-      appdata.s = appdata.s != 1;
-      //It's control packet
-      if(info.data[0] != 1){
-        if(info.data[0] == 3){
-          fclose(newFD);
-          return 1;
-        }
-        unsigned char i=1;
-        printBuffer(info.data, info.nBytes);
-        while(i < info.nBytes){
-          //printf("--%d\n", i);
-          if(info.data[i] == 0){
-            unsigned char nChars = info.data[i + 1];
-            for(char j=nChars - 1; j >=0; j--){
-              size = (size<<8) + info.data[i + 2 + j];
-            }
-            i+= nChars + 2;
-          }
-          else if(info.data[i] == 1){
-            unsigned char nChars = info.data[i + 1];
-            filename = (char *) malloc(1 * nChars);
-            for(unsigned char j=0; j < nChars; j++){
-              filename[j] = info.data[i + 2 + j];
-            }
-            i+= nChars + 3;
-          }
-        }
-        printf("Filename = %s\n", filename);
-        printf("Filesize = %lu\n", size);
-        //Create file
-        newFD = fopen(filename, "w+");
-        nSeq = 0;
-      } else if(info.data[0] == 1){
-        //It's file data
-        nSeq = (nSeq + 1) % 255;
-        if(nSeq != info.data[1]){
-        }
-        unsigned numberOfChars = (info.data[1] << 8) + info.data[2];
-        for(unsigned i=0; i < numberOfChars; i++){
-          fwrite(info.data + 3 + i, 1 , 1, newFD);
-        }
-      }
-      printf("send C_RR S=%d\n", appdata.s);
-      writeMessage(fd, A_EMISSOR, C_RR(appdata.s));
-    } else if(info.type == CONTROL && info.data[0] == C_DISC){
-      printf("IT's a disc");
-      writeMessage(fd, A_RECETOR, C_DISC);
-    }
-  } while(!(info.type == CONTROL && info.data[0] == C_DISC));
+  readFile(argv[1]);
+ 
 
 
 }

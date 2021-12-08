@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <strings.h>
-#include "../common/common.h"
+#include "../common/application.h"
 #define BAUDRATE B38400
 #define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
@@ -28,7 +28,7 @@ char msg[5];
 
 int main(int argc, char** argv)
 {
-  int fd;
+  //int fd;
   
   //int i, sum = 0, speed = 0;
   
@@ -129,19 +129,10 @@ int main(int argc, char** argv)
 //     }
 //   }
   
-  printf("calling llopen writer\n");
-  ApplicationData appdata;
-  appdata.s = 0;
-  fd = llopen(argv[1], 1, &appdata);
-  if(fd == -1){
-    //f
-    exit(-1);
-  }
+  
+  printf("--%s\n", argv[1]);
   char * filePath = "./pinguim.gif";
-  
-  
-  writeFile(fd, filePath, &appdata);
-  llclose(fd, 1, &appdata);
+  writeFile(filePath, argv[1]); 
   
   //close(fd);
   return 0;

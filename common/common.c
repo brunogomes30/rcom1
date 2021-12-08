@@ -1,3 +1,4 @@
+/*
 #include "common.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -16,7 +17,6 @@ void printBuffer(unsigned char * buffer, unsigned size){
 
 int checkBCC(unsigned char byte, unsigned char *msg){
   return byte == (msg[2] ^ msg[1]);
-  
 }
 int llopen(char *port, int isTransmitter, ApplicationData *appdata){
   int fd = open(port, O_RDWR | O_NOCTTY);
@@ -29,7 +29,7 @@ int llopen(char *port, int isTransmitter, ApplicationData *appdata){
   }
   struct termios oldtio,newtio;
   if (tcgetattr(fd, &oldtio) == -1)
-  { /* save current port settings */
+  { 
     perror("tcgetattr");
     //exit(-1);
     return -1;
@@ -40,10 +40,10 @@ int llopen(char *port, int isTransmitter, ApplicationData *appdata){
   newtio.c_iflag = IGNPAR;
   newtio.c_oflag = 0;
 
-  /* set input mode (non-canonical, no echo,...) */
+  
   newtio.c_lflag = 0;
-  newtio.c_cc[VTIME] = 0; /* inter-character timer unused */
-  newtio.c_cc[VMIN] = 1;  /* blocking read until 5 chars received */
+  newtio.c_cc[VTIME] = 0; 
+  newtio.c_cc[VMIN] = 1;  
 
   tcflush(fd, TCIOFLUSH);
 
@@ -466,3 +466,4 @@ int readData(int fd, unsigned char *data, State *state){
   *state = STOP_STATE;
   return 0;
 }
+*/
