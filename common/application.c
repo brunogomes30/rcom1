@@ -17,13 +17,16 @@ int writeFile(char *file, char *port){
 
     unsigned long filelen = fileData.filelen;
     FILE* fileFD = fopen(file, "rb");
-    unsigned char buffer[MAX_PER_PACKET];
+    unsigned char buffer[MAX_SIZE];
     unsigned char dataPacket[MAX_SIZE];
     unsigned long bytesWritten = 0;
     unsigned char nseq = 0;
     while(bytesWritten < filelen){
         nseq = (nseq + 1) % 255;
-        unsigned char readInThisPacket = filelen - bytesWritten < MAX_PER_PACKET ? filelen - bytesWritten : MAX_PER_PACKET;
+        printf("Bytes written so far: %lu\n", bytesWritten);
+        unsigned long percentage = (bytesWritten * 100) / filelen;
+        printf("%lu%% Done\n", percentage);
+        unsigned int readInThisPacket = filelen - bytesWritten < MAX_PER_PACKET ? filelen - bytesWritten : MAX_PER_PACKET;
         //buffer[2] = 
         fread(buffer, 1, readInThisPacket, fileFD);
         bytesWritten += readInThisPacket;
@@ -32,7 +35,7 @@ int writeFile(char *file, char *port){
         unsigned int dataPacketSize = writeDataPacket(dataPacket, buffer, readInThisPacket, nseq);
         do{
             ntries ++;
-            printf("Writting %d bytes... try nº%d", readInThisPacket, ntries);
+            printf("Writting %d bytes... try nº%d\n", readInThisPacket, ntries);
             res = writeData(fd, dataPacket, dataPacketSize);
             if(res == -1){
                 printf("#### trying again\n");
@@ -80,8 +83,8 @@ FileData readFileData(char *file){
     fileData.filenameLen = strlen(filename);
     //unsigned char buffer[MAX_SIZE];
     stat(file, &st);
-    //fileData.filenameLen = strlen(filename);
-    fileData.filename = (char *) malloc(strlen(filename) * 1);
+    fileData.filenameLen = strlen(filename);
+    fileData.filename = (char *) malloc(strlen(filename) * 1 + 1);
     memcpy(fileData.filename, filename,fileData.filenameLen);
     fileData.filelen = st.st_size;
     return fileData;
@@ -95,14 +98,17 @@ int writeControlPacket(FileData fileData, int fd, int isStart){
     buffer[nBytes++] = isStart == 1 ? 2 : 3;
     buffer[nBytes++] = 0;
     buffer[nBytes++] = 4;
-    for(int i=0; i < 4; i++){
-        buffer[nBytes++] = (4 >> (8 * i)) & 0xff;
-    }
+    memcpy(buffer+ nBytes, &fileData.filelen, 4);
+    nBytes += 4;
+    //for(int i=0; i < 4; i++){
+    //    buffer[nBytes++] = (4 >> (8 * i)) & 0xff;
+    //}
     buffer[nBytes++] = 1;
-    buffer[nBytes++] = fileData.filenameLen;
+    buffer[nBytes++] = fileData.filenameLen + 1;
     for(int i=0; i < fileData.filenameLen; i++){
         buffer[nBytes++] = fileData.filename[i];
     }
+    buffer[nBytes++] = 0;
     writeData(fd, buffer, nBytes);
     return 1;
 }
@@ -110,8 +116,7 @@ int writeControlPacket(FileData fileData, int fd, int isStart){
 unsigned int writeDataPacket(unsigned char *dataPacket , unsigned char* data, unsigned int size, unsigned char nseq){
     dataPacket[0] = 1;
     dataPacket[1] = nseq;
-    dataPacket[2] = (size >> 8) & 0xff;
-    dataPacket[3] = size & 0xff;
+    memcpy(dataPacket + 2, &size, 2);
     memcpy(dataPacket + 4, data, size);
     return size + 4;
 }
@@ -127,35 +132,39 @@ int readFile(char * port){
     unsigned finished = 0;
     FileData fileDataStart, fileDataEnd;
     FILE* fileFD;
+    MessageInfo info;
     while(!finished){
         printf("######Ready to read next data...\n\n");
-        MessageInfo info = readMessage(fd);
-        S = info.s == 1 ? 0 : 1;
-        if(info.type != DATA){
-            printf("Ocorreu um erro\n");
-            writeMessage(fd, A_EMISSOR, C_REJ(S));
-            break;
-        }
-        printf("Data sent with S = %d\n", info.s);
+        unsigned tries = 0;
+        do{
+            info = readMessage(fd);
+            if(info.type != DATA){
+                printf("Ocorreu um erro\n");
+                writeMessage(fd, A_EMISSOR, C_REJ(S));
+                tries++;
+            }else {
+                S = info.s == 1 ? 0 : 1;
+                break;
+            }
+        }while( tries < 3);
+        //printf("Data sent with S = %d\n", info.s);
         
         changeS(S);
         writeMessage(fd, A_EMISSOR, C_RR(S));
-        printf("Switch case info.data[0] = %d\n", info.data[0]);
         switch(info.data[0]){
             case 1:
-                printf("case 1\n\n");
+                //printf("case 1\n\n");
                 //Data packet
-                writeToFile(info.data, info.dataSize, fileDataStart);
+                //printBuffer(info.data + 4, info.dataSize - 4);
+                writeToFile(info.data + 4, info.dataSize - 4, fileDataStart);
                 break;
             case 2:
-                printf("case 2\n");
                 //Control packet begin
                 fileDataStart = readControlPacket(info.data, info.dataSize);
                 fileFD = fopen((char *) fileDataStart.filename, "w+");
                 fclose(fileFD);
                 break;
             case 3:
-                printf("case 3\n");
                 //Control packet end
                 fileDataEnd = readControlPacket(info.data, info.dataSize);
 
@@ -196,25 +205,24 @@ FileData readControlPacket(unsigned char *packet, unsigned int nBytes){
     }
     currByte++;
     fileData.filelen = 0;
-    while (currByte <= nBytes){
+    while (currByte < nBytes){
+        printf("Start read control packet %u\n", currByte);
         type = packet[currByte++];
         typeSize = packet[currByte++];
         
         if (type == 0){
-            for (unsigned i = 0; i <= typeSize; i++){
-                fileData.filelen += packet[currByte++] << (typeSize - i)*8; 
-            }
+            memcpy(&fileData.filelen, packet + currByte, 4);
+            currByte += typeSize;
         }
         else if (type == 1){
             fileData.filenameLen = typeSize;
             fileData.filename = (char*) malloc(typeSize * 1);
             memcpy(fileData.filename, packet + currByte, typeSize);
-            //strcpy( (char *) fileData.filename, packet + currByte); 
+            currByte += typeSize;
         }
         else {
             perror("Undefined type for control packet");
         }
-        currByte += typeSize;
     } 
     printf("Filelen = %lu\n", fileData.filelen);
     printf("Filename len = %u\n", fileData.filenameLen);
@@ -223,9 +231,11 @@ FileData readControlPacket(unsigned char *packet, unsigned int nBytes){
 }
 
 int writeToFile(unsigned char* data, unsigned int dataSize, FileData fileData){
-    FILE* fileFD = fopen((char *) fileData.filename, "ab");
-    fwrite(data, dataSize, 1, fileFD);
+    
+    FILE* fileFD = fopen(fileData.filename, "ab");
+    fwrite(data, 1, dataSize, fileFD);
     fclose(fileFD);
+    
     return 0;
 }
 
