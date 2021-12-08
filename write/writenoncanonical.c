@@ -26,112 +26,15 @@ volatile int STOP =FALSE;
 State currentState;
 char msg[5];
 
-int main(int argc, char** argv)
-{
-  //int fd;
-  
-  //int i, sum = 0, speed = 0;
-  
+int main(int argc, char** argv) {
+
   if ((argc < 2)) {
     printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
     exit(1);
   }
-
-
-/*
-  Open serial port device for reading and writing and not as controlling tty
-  because we don't want to get killed if linenoise sends CTRL-C.
-*/
-
-
-//   fd = open(argv[1], O_RDWR | O_NOCTTY );
-//   if (fd <0) {perror(argv[1]); exit(-1); }
-
-//   if ( tcgetattr(fd,&oldtio) == -1) { /* save current port settings */
-//     perror("tcgetattr");
-//     exit(-1);
-//   }
-
-//   bzero(&newtio, sizeof(newtio));
-//   newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-//   newtio.c_iflag = IGNPAR;
-//   newtio.c_oflag = 0;
-
-//   /* set input mode (non-canonical, no echo,...) */
-//   newtio.c_lflag = 0;
-
-//   newtio.c_cc[VTIME]    = 30;   /* inter-character timer unused */
-//   newtio.c_cc[VMIN]     = 0;   /* blocking read until 5 chars received */
-
-
-
-// /* 
-//   VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a 
-//   leitura do(s) pr�ximo(s) caracter(es)
-// */
-
-
-
-//   tcflush(fd, TCIOFLUSH);
-
-//   if ( tcsetattr(fd,TCSANOW,&newtio) == -1) {
-//     perror("tcsetattr");
-//     exit(-1);
-//   }
-
-//   printf("New termios structure set\n");
-  
-  
-
-// /*
-//   //DEFINE SET
-//   msg[0] = FLAG;
-//   msg[1] = A_EMISSOR;
-//   msg[2] = C_SET;
-//   msg[3] = msg[1] ^ msg[2];
-//   msg[4] =  FLAG;
-
-//   //res = write(fd,msg,sizeof(msg));   
-//   res = write(fd, msg, 1);
-//   printf("%d bytes written\n", res);
-
-
-// /* 
-//   O ciclo FOR e as instru��es seguintes devem ser alterados de modo a respeitar 
-//   o indicado no gui�o 
-// */
-
-
-// /*
-//   sleep(2);
-//   if ( tcsetattr(fd,TCSANOW,&oldtio) == -1) {
-//     perror("tcsetattr");
-//     exit(-1);
-//   }
-// */
-//   sleep(2);
-//   currentState = START;
-//   //READ UA pls
-//   char byte[100];
-//   while (STOP==FALSE) {     
-//     printf("currentState %d\n", currentState);
-//     res = read(fd,byte,1);
-
-//     currentState = changeState(byte[0],currentState, msg);
-//     printf("currentState %d\n", currentState);
-//     if(currentState == STOP_STATE){
-//       printf("Success!");
-//       if(msg[2] == C_UA){
-//         printf("C_UA RECEIVED\n");
-//       }
-      
-//       break;
-//     }
-//   }
-  
   
   printf("--%s\n", argv[1]);
-  char * filePath = "./pinguim.gif";
+  char * filePath = argv[2];
   writeFile(filePath, argv[1]); 
   
   //close(fd);

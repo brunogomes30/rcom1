@@ -16,7 +16,7 @@
 #define C_UA  0b00000111
 #define C_RR(S)  (0x5 |  (S << 7))
 #define C_REJ(S)  (0x1 | (S << 7))
-#define ESCAPE 0b01111110
+#define ESCAPE 0x7d
 #define MAX_PER_PACKET 100
 #define MAX_SIZE 300
 #define BIT(n) 1 << n
@@ -34,6 +34,9 @@ typedef struct {
     unsigned dataSize;
     int s;
 } MessageInfo;
+
+
+void printBuffer(unsigned char *buffer, unsigned size);
 
 /**
  * @brief Returns fd
