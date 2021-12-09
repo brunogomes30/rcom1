@@ -52,6 +52,9 @@ int llopen(char *port, int isTransmitter);
  */
 int llclose(int fd, int isTransmitter);
 
+int llread(int fd, unsigned char *data);
+
+int llwrite(int fd, unsigned char *data, unsigned nBytes);
 
 /**
  * @brief Writes data, until a RR message is received

@@ -59,8 +59,6 @@ int llopen(char *port, int isTransmitter)
     do{
         if (isTransmitter)
         {   
-            
-            
             writeMessage(fd, A_EMISSOR, C_SET);
             info = readMessage(fd);
             if(info.type == ERROR){
@@ -68,7 +66,6 @@ int llopen(char *port, int isTransmitter)
             } else {
                 break;
             }
-            
         }
         else {
             info = readMessage(fd);
@@ -109,13 +106,14 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
             tries++;
             break;
         case CONTROL:
-            if (info.data[0] == C_RR(S == 1 ? 0 : 1))
+            if (info.data[0] == C_RR(info.s))
             {
                 S = info.s;
                 exitWhile = 1;
             }else {
                 info.s = S;
-                info.data[0] = C_REJ(S == 1 ? 0 : 1);
+                if(info.data[0] == C_REJ(info.s))
+                    printf("Received C_REJ####\n####\n####\n");
                 return -1;
             }
             break;
@@ -125,7 +123,6 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
         }
         if (exitWhile)
             break;
-        //free(info.data);
     }
 
     if (tries == 5)
@@ -136,8 +133,39 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
     return 0;
 }
 
-unsigned buildDataFrame(unsigned char *data, unsigned nBytes, unsigned char *dataFrame)
-{
+int llwrite(int fd, unsigned char *data, unsigned nBytes){
+    return writeData(fd, data, nBytes);
+}
+
+int llread(int fd, unsigned char *data){
+    MessageInfo info;
+    unsigned tries = 0;
+    do{
+        info = readMessage(fd);
+        if(info.type != DATA){
+            printf("An error has occured while reading message\n");
+            writeMessage(fd, A_EMISSOR, C_REJ(S));
+            tries++;
+        }else {
+            S = info.s == 1 ? 0 : 1;
+            break;
+        }
+    }while( tries < 3);
+    //printf("Data sent with S = %d\n", info.s);
+    
+    if(tries < 3){
+        changeS(S);
+        writeMessage(fd, A_EMISSOR, C_RR(S));
+        memcpy(data, info.data, info.dataSize);
+        free(info.data);
+        return info.dataSize;
+    } else {
+        writeMessage(fd, A_EMISSOR, C_REJ(S));
+        return -1;
+    }
+}
+
+unsigned buildDataFrame(unsigned char *data, unsigned nBytes, unsigned char *dataFrame) {
     unsigned char buffer[MAX_SIZE];
     unsigned bufferSize = 0;
 
@@ -184,15 +212,12 @@ unsigned stuffData(unsigned char *data, unsigned nBytes, unsigned char *stuffedD
         if (data[i] == FLAG) {
             stuffedData[stuffedSize++] = ESCAPE;
             stuffedData[stuffedSize++] = 0x5e;
-            // write(fd, stuffedData, 2);
         }
         else if (data[i] == ESCAPE) {
             stuffedData[stuffedSize++] = ESCAPE;
             stuffedData[stuffedSize++] = 0x5d;
-            // write(fd, stuffedData, 2);
         }
         else {
-            // write(fd, stuffedData + i, 1);
             stuffedData[stuffedSize++] = data[i];
         }
     }
@@ -205,10 +230,6 @@ void writeMessage(int fd, unsigned char address, unsigned char C)
     unsigned char buffer[5];
     buffer[0] = FLAG;
     buffer[1] = address;
-    if (C == C_RR(0) || C == C_REJ(0))
-    {
-        //C = C | S;
-    }
     buffer[2] = C;
     buffer[3] = address ^ C;
     buffer[4] = FLAG;
@@ -220,19 +241,15 @@ MessageInfo readMessage(int fd)
     unsigned char buffer[MAX_SIZE];
     unsigned bufferSize = 0;
     State state = START;
-    // unsigned isData = 0;
     unsigned stuffedDataSize = 0;
     MessageInfo info;
     unsigned tries = 0;
     while (state != STOP_STATE && tries < 5)
     {
         int res = read(fd, buffer + (bufferSize), 1);
-        if (res == 0)
-        {
-            //printf("timeout? %d\n", tries);
+        if (res == 0) {
             tries++;
         }
-        // Verificar timeout com o res
 
         if (!(state == BCC_OK && info.type == DATA))
             state = changeState(buffer[bufferSize], state, buffer, S);
@@ -299,12 +316,12 @@ MessageInfo readMessage(int fd)
     } else {
         givenBCC = buffer[stuffedDataSize + 5];
     }
-    /*
+    
     //Used to create random errors
     if(rand() % 30 == 0){
         givenBCC -= 1;
     }
-    */
+    
     unsigned dataSize = unstuffData(stuffedData, data, stuffedDataSize, givenBCC);
     if (dataSize == -1)
     {
@@ -485,7 +502,7 @@ int checkBCC(unsigned char byte, unsigned char *msg)
 
 int isC(unsigned char byte, char S)
 {
-    return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR(S) || byte == C_REJ(S) || byte == (S == 1 ? BIT(6) : 0);
+    return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR(S) || byte == C_REJ(S) || byte == C_REJ(S == 1 ? 0 : 1) || byte == (S == 1 ? BIT(6) : 0);
     //return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR(S) || byte == C_RR(S) || byte == C_REJ(0) || byte == C_REJ(1) || byte == BIT(6)  || byte == 0;
 }
 
