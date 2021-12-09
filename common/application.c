@@ -23,6 +23,7 @@ int writeFile(char *file, char *port){
     unsigned char dataPacket[MAX_SIZE];
     unsigned long bytesWritten = 0;
     unsigned char nseq = 0;
+    unsigned failedToWrite = 0;
     while(bytesWritten < filelen){
         nseq = (nseq + 1) % 255;
         printf("Bytes written so far: %lu\n", bytesWritten);
@@ -41,15 +42,21 @@ int writeFile(char *file, char *port){
             res = llwrite(fd, dataPacket, dataPacketSize);
             if(res == -1){
                 printf("#### trying again\n");
-                ntries++;
                 continue;
             } else {
                 break;
             }
         } while(ntries < 5);
+        if(ntries == 5){
+            failedToWrite = 1;
+            break;
+        }
         printf("proceeding to next packet\n");
     }
-
+    if(failedToWrite){
+        printf("Failed to write file \n");
+        return -1;
+    }
     //Write end packet
     writeControlPacket(fileData, fd, 0);
     printf("Sent file successfully, closing...\n");
@@ -131,7 +138,7 @@ int readFile(char * port){
             switch(data[0]){
                 case 1:
                     if(currentNSeq == data[1]){
-                        currentNSeq++;
+                        currentNSeq = (currentNSeq + 1 ) % 255;
                         writeToFile(data + 4, dataSize - 4, fileDataStart);
                         bytesReadSoFar += dataSize - 4;
                         printf("%lu%% done\n", (bytesReadSoFar * 100) / fileDataStart.filelen);
@@ -151,7 +158,6 @@ int readFile(char * port){
                     break;
             }
         } else {
-            printf("Increasing ntries\n");
             ntries++;
         }
 

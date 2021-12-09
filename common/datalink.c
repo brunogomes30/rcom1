@@ -93,7 +93,7 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
     // buildDataFrame(data, nBytes, dataFrame);
     unsigned tries = 0;
     unsigned char exitWhile = 0;
-    while (tries < 5)
+    while (tries < 3)
     {
         write(fd, dataFrame, dataFrameSize);
         S = S == 1 ? 0 : 1;
@@ -111,7 +111,8 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
                 S = info.s;
                 exitWhile = 1;
             }else {
-                info.s = S;
+                //info.s = S;
+                S = info.s;
                 if(info.data[0] == C_REJ(info.s))
                     printf("Received C_REJ####\n####\n####\n");
                 return -1;
@@ -125,9 +126,9 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
             break;
     }
 
-    if (tries == 5)
+    if (tries == 3)
     {
-        printf("Failed to write 5 times in a row\n");
+        printf("Failed to write 3 times in a row\n");
         return -1;
     }
     return 0;
@@ -143,7 +144,7 @@ int llread(int fd, unsigned char *data){
     do{
         info = readMessage(fd);
         if(info.type != DATA){
-            printf("An error has occured while reading message\n");
+            //printf("An error has occured while reading message %d %x \n", info.type, info.data[0]);
             writeMessage(fd, A_EMISSOR, C_REJ(S));
             tries++;
         }else {
@@ -244,8 +245,7 @@ MessageInfo readMessage(int fd)
     unsigned stuffedDataSize = 0;
     MessageInfo info;
     unsigned tries = 0;
-    while (state != STOP_STATE && tries < 5)
-    {
+    while (state != STOP_STATE && tries < 5) {
         int res = read(fd, buffer + (bufferSize), 1);
         if (res == 0) {
             tries++;
@@ -294,8 +294,7 @@ MessageInfo readMessage(int fd)
         bufferSize++;
     }
 
-    if (state != STOP_STATE)
-    {
+    if (state != STOP_STATE) {
         info.type = ERROR;
         info.dataSize = 0;
         info.s = S;
@@ -319,7 +318,7 @@ MessageInfo readMessage(int fd)
     
     //Used to create random errors
     if(rand() % 30 == 0){
-        givenBCC -= 1;
+        //givenBCC -= 1;
     }
     
     unsigned dataSize = unstuffData(stuffedData, data, stuffedDataSize, givenBCC);
@@ -500,8 +499,7 @@ int checkBCC(unsigned char byte, unsigned char *msg)
     return byte == (msg[2] ^ msg[1]);
 }
 
-int isC(unsigned char byte, char S)
-{
+int isC(unsigned char byte, char S) {
     return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR(S) || byte == C_REJ(S) || byte == C_REJ(S == 1 ? 0 : 1) || byte == (S == 1 ? BIT(6) : 0);
     //return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR(S) || byte == C_RR(S) || byte == C_REJ(0) || byte == C_REJ(1) || byte == BIT(6)  || byte == 0;
 }
