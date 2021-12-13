@@ -19,8 +19,6 @@ int writeFile(char *path, char* port);
 FileData readFileData(char *file);
 int writeControlPacket(FileData fileData, int fd, int isStart);
 unsigned int assembleDataPacket(unsigned char *dataPacket , unsigned char* data, unsigned int size, unsigned char nseq);
-//FileData readControlPacket(unsigned char *packet);
-int readDataPacket(unsigned char *packet, unsigned int nBytes);
 
 FileData readControlPacket(unsigned char *packet, unsigned int nBytes);
 
