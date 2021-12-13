@@ -35,7 +35,7 @@ int writeFile(char *file, char *port){
         bytesWritten += readInThisPacket;
         //Send packet
         int res, ntries = 0;
-        unsigned int dataPacketSize = writeDataPacket(dataPacket, buffer, readInThisPacket, nseq);
+        unsigned int dataPacketSize = assembleDataPacket(dataPacket, buffer, readInThisPacket, nseq);
         do{
             ntries ++;
             printf("Writting %d bytes... try nº%d\n", readInThisPacket, ntries);
@@ -100,7 +100,7 @@ int writeControlPacket(FileData fileData, int fd, int isStart){
     return 1;
 }
 
-unsigned int writeDataPacket(unsigned char *dataPacket , unsigned char* data, unsigned int size, unsigned char nseq){
+unsigned int assembleDataPacket(unsigned char *dataPacket , unsigned char* data, unsigned int size, unsigned char nseq){
     dataPacket[0] = 1;
     dataPacket[1] = nseq;
     memcpy(dataPacket + 2, &size, 2);

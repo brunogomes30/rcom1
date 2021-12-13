@@ -2,7 +2,6 @@
 
 static unsigned char S = 0;
 
-// Fazer application.h e application.c
 void changeS(unsigned char v){
     S = v;
 }
@@ -23,7 +22,6 @@ int llopen(char *port, int isTransmitter)
     if (fd < 0)
     {
         perror(port);
-        // exit(-1);
         return -1;
     }
     struct termios oldtio, newtio;
@@ -90,7 +88,6 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
 {
     unsigned char dataFrame[MAX_SIZE];
     unsigned dataFrameSize = buildDataFrame(data, nBytes, dataFrame);
-    // buildDataFrame(data, nBytes, dataFrame);
     unsigned tries = 0;
     unsigned char exitWhile = 0;
     while (tries < 3)
@@ -113,13 +110,12 @@ int writeData(int fd, unsigned char *data, unsigned nBytes)
             }else {
                 //info.s = S;
                 S = info.s;
-                if(info.data[0] == C_REJ(info.s))
-                    printf("Received C_REJ####\n####\n####\n");
                 return -1;
             }
             break;
         case DATA:
-            printf("Leu data?? WTF???\n");
+            tries++;
+            //Shouldn't happen
             break;
         }
         if (exitWhile)
@@ -144,7 +140,6 @@ int llread(int fd, unsigned char *data){
     do{
         info = readMessage(fd);
         if(info.type != DATA){
-            //printf("An error has occured while reading message %d %x \n", info.type, info.data[0]);
             writeMessage(fd, A_EMISSOR, C_REJ(S));
             tries++;
         }else {
@@ -152,7 +147,6 @@ int llread(int fd, unsigned char *data){
             break;
         }
     }while( tries < 3);
-    //printf("Data sent with S = %d\n", info.s);
     
     if(tries < 3){
         changeS(S);
@@ -193,15 +187,6 @@ unsigned buildDataFrame(unsigned char *data, unsigned nBytes, unsigned char *dat
     }
     buffer[bufferSize++] = FLAG;
     memcpy(dataFrame, buffer, bufferSize);
-
-    /*
-    unsigned char unstuffedData[300];
-    unstuffData(buffer + dataFrameSize, unstuffedData, stuffedDataSize, bcc);
-    for(unsigned i=0; i < nBytes; i++){
-        if(data[i] != unstuffedData[i])
-            printf("Stuffed = %x, Unstuffed = %x \n", buffer[dataFrameSize + i], unstuffedData[i]);
-    }
-    */
     return bufferSize;
 }
 
@@ -318,14 +303,14 @@ MessageInfo readMessage(int fd)
     
     //Used to create random errors
     if(rand() % 30 == 0){
-        //givenBCC -= 1;
+        givenBCC -= 1;
     }
     
     unsigned dataSize = unstuffData(stuffedData, data, stuffedDataSize, givenBCC);
-    if (dataSize == -1)
+    if (dataSize == 0)
     {
         // Try again
-        printf("######\n###Erro no bcc\n######\n");
+        printf("######\n###BCC error\n######\n");
         info.type = ERROR;
         info.s = S;
         info.dataSize = 0;
@@ -334,8 +319,6 @@ MessageInfo readMessage(int fd)
     info.data = (unsigned char *) malloc(sizeof(unsigned char) * dataSize);
     info.dataSize = dataSize;
     memcpy(info.data, data, dataSize);
-    //S = S == 0 ? 1 : 0;
-    //info.s = S;
 
     return info;
 }
@@ -362,7 +345,7 @@ unsigned unstuffData(unsigned char *stuffedData, unsigned char *data, unsigned s
             }
             else
             {
-                printf("Mandou escape sem flag ou escape############################\n");
+                return 0;
             }
         }
         else if (c == ESCAPE)
@@ -371,31 +354,30 @@ unsigned unstuffData(unsigned char *stuffedData, unsigned char *data, unsigned s
         }
         else if (c == FLAG)
         {
-            printf("Mandou flag na stuffedData#################################################\n");
+            return 0;
         }
         if (!previousIsEscape) {
             data[dataSize++] = c;
             bcc = bcc ^ c;
-            //printf("c = %x \t", c);
         }
     }
     if (bcc != givenBCC)
     {
-        printf("\nCalculated bcc = %x, given bcc = %x \n", bcc, givenBCC);
-        return -1;
+        //printf("\nCalculated bcc = %x, given bcc = %x \n", bcc, givenBCC);
+        return 0;
     }
     return dataSize;
 }
 
 int llclose(int fd, int isTransmitter)
 {
-    // DISC -> DISC -> UA
     if (isTransmitter)
     {
         writeMessage(fd, A_EMISSOR, C_DISC);
         MessageInfo info = readMessage(fd);
         if (info.type == ERROR)
         {
+            return -1;
         }
         if (info.type == CONTROL && info.data[0] == C_DISC)
         {
@@ -408,7 +390,7 @@ int llclose(int fd, int isTransmitter)
         MessageInfo info = readMessage(fd);
         if (info.type == ERROR)
         {
-            //-1
+            return -1;
         }
         if (info.type == CONTROL && info.data[0] == C_DISC)
         {
@@ -501,6 +483,5 @@ int checkBCC(unsigned char byte, unsigned char *msg)
 
 int isC(unsigned char byte, char S) {
     return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR(S) || byte == C_REJ(S) || byte == C_REJ(S == 1 ? 0 : 1) || byte == (S == 1 ? BIT(6) : 0);
-    //return byte == C_SET || byte == C_DISC || byte == C_UA || byte == C_RR(S) || byte == C_RR(S) || byte == C_REJ(0) || byte == C_REJ(1) || byte == BIT(6)  || byte == 0;
 }
 

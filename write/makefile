@@ -1,5 +1,5 @@
 writenoncanonical: *.c ../common/*.c ../common/*.h
-	gcc *.c ../common/*.c -Wall -o writenoncanonical
+	gcc *.c ../common/*.c -Wall -o writer
 
 clean :
-	rm *.o writenoncanonical
+	rm *.o writer
